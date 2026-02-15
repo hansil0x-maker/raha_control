@@ -9,18 +9,22 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Raha Control Center',
-        short_name: 'Raha Admin',
-        description: 'Super Admin Dashboard for Raha Pharmacy System',
-        theme_color: '#ffffff',
+        name: 'مركز تحكم راحة',
+        short_name: 'راحة',
+        description: 'لوحة تحكم المشرف العام لنظام راحة',
+        theme_color: '#4f46e5',
+        background_color: '#f9fafb',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
         icons: [
           {
-            src: 'favicon.ico',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'favicon.ico',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           }
