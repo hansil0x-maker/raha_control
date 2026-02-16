@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
 import Button from '../components/ui/Button';
-import { SUPER_ADMIN_PIN, APP_NAME } from '../constants';
+import { APP_NAME } from '../constants';
 
 interface LoginProps {
   onLogin: () => void;
@@ -17,39 +17,38 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
     setError('');
 
-    // Simulate API delay
     setTimeout(() => {
-      if (pin === SUPER_ADMIN_PIN) {
+      // Phase 6 Auth Logic: Check localStorage first (setup by main index.tsx or default)
+      const storedPin = localStorage.getItem('raha_admin_pin') || '1234';
+      
+      if (pin === storedPin) {
         onLogin();
       } else {
-        setError('رمز الدخول غير صحيح. الرجاء المحاولة مرة أخرى.');
+        setError('رمز الدخول غير صحيح.');
         setIsLoading(false);
       }
-    }, 800);
+    }, 500);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
         <div className="p-8">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
               <ShieldCheck size={32} />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">{APP_NAME}</h1>
-            <p className="text-gray-500 text-sm mt-2 text-center">
-              أدخل رمز المشرف العام للدخول إلى اللوحة
+            <h1 className="text-2xl font-bold text-white">{APP_NAME}</h1>
+            <p className="text-slate-400 text-sm mt-2 text-center">
+              Super Admin Access
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="pin" className="block text-sm font-medium text-gray-700 mb-2">
-                رمز الأمان
-              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <LockKeyhole className="h-5 w-5 text-gray-400" />
+                  <LockKeyhole className="h-5 w-5 text-slate-500" />
                 </div>
                 <input
                   type="password"
@@ -57,33 +56,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   maxLength={6}
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  className="block w-full pr-10 pl-3 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-lg tracking-widest placeholder-gray-400"
+                  className="block w-full pr-10 pl-3 py-4 bg-slate-900 border border-slate-600 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-white text-center text-2xl tracking-[0.5em] font-bold placeholder-slate-700 transition-all"
                   placeholder="••••"
                   autoFocus
                 />
               </div>
               {error && (
-                <p className="mt-2 text-sm text-red-600 flex items-center">
-                  <span className="ms-1">●</span> {error}
+                <p className="mt-4 text-sm text-red-400 bg-red-900/20 p-2 rounded text-center">
+                  {error}
                 </p>
               )}
             </div>
 
             <Button
               type="submit"
-              className="w-full py-3"
+              className="w-full py-4 text-lg font-bold shadow-lg shadow-indigo-900/50"
               size="lg"
               isLoading={isLoading}
               disabled={pin.length === 0}
             >
-              دخول للوحة التحكم
+              DASHBOARD LOGIN
             </Button>
           </form>
-        </div>
-        <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
-          <p className="text-xs text-gray-400">
-            نظام آمن • للموظفين المصرح لهم فقط
-          </p>
         </div>
       </div>
     </div>

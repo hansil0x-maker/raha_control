@@ -1,41 +1,72 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#4f46e5" />
-    <title>لوحة تحكم راحة</title>
+    <meta name="theme-color" content="#0f172a" />
+    <title>لوحة تحكم راحة | Raha Super Admin</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              slate: {
+                850: '#151e32',
+                900: '#0f172a',
+                950: '#020617',
+              }
+            },
+            fontFamily: {
+              sans: ['Cairo', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
     <!-- Google Fonts: Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-      body { font-family: 'Cairo', sans-serif; }
-      /* Scrollbar Styling */
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #1e293b; }
+      ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+      
+      .glass-card {
+        background: linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+      }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react",
+    "recharts": "https://esm.sh/recharts@2.12.2?external=react,react-dom",
+    "framer-motion": "https://esm.sh/framer-motion@11.0.8?external=react,react-dom",
+    "clsx": "https://esm.sh/clsx",
+    "tailwind-merge": "https://esm.sh/tailwind-merge",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
     "vite-plugin-pwa": "https://esm.sh/vite-plugin-pwa@^1.2.0"
   }
 }
 </script>
-</head>
-  <body class="bg-gray-50 text-gray-900 antialiased overflow-hidden">
+  </head>
+  <body class="antialiased overflow-hidden selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
