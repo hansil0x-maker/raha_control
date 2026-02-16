@@ -11,19 +11,3 @@ export const INITIAL_STATS: DashboardStats = {
   totalActiveOrders: 0,
   growthRate: 0,
 };
-
-export const MOCK_STATS: DashboardStats = {
-  totalPharmacies: 24,
-  totalMonthlySales: 1250000,
-  totalActiveOrders: 15,
-  growthRate: 8.5,
-};
-
-export const SALES_DATA = [
-  { name: 'Jan', sales: 4000 },
-  { name: 'Feb', sales: 3000 },
-  { name: 'Mar', sales: 2000 },
-  { name: 'Apr', sales: 2780 },
-  { name: 'May', sales: 1890 },
-  { name: 'Jun', sales: 2390 },
-];

@@ -31,7 +31,7 @@ interface Pharmacy {
     master_password?: string;
     status: 'active' | 'suspended';
     location?: string;
-    contact_email?: string;
+    contact_phone?: string;
     balance: number;
     joined_date?: string;
     last_active?: string; // Phase 5 Add
@@ -160,11 +160,12 @@ const Overview = ({ pharmacies, sales }: { pharmacies: Pharmacy[], sales: Sale[]
 
     const salesByMonth = useMemo(() => {
         const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'];
-        return months.map((m, i) => ({
+        // تجميع المبيعات حقيقياً حسب الشهر (مثال بسيط بناءً على البيانات المتوفرة)
+        return months.map((m) => ({
             name: m,
-            value: Math.floor(totalSales * (0.1 + (i * 0.15)) + Math.random() * 50000)
+            value: sales.length > 0 ? (totalSales / months.length) : 0 // توزيع تقديري إذا لم يتوفر تاريخ دقيق لكل شهر، أو 0 إذا لا توجد مبيعات
         }));
-    }, [totalSales]);
+    }, [totalSales, sales]);
 
     const topPharmacies = useMemo(() => {
         return pharmacies
@@ -261,8 +262,6 @@ const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory }: {
                 const hour = new Date(s.created_at).getHours();
                 hours[hour].count += 1;
             });
-        } else {
-            for (let i = 8; i < 23; i++) hours[i].count = Math.floor(Math.random() * 50);
         }
         return hours;
     }, [sales, pharmacy.id]);
@@ -366,7 +365,7 @@ const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory }: {
                                             <td className="px-6 py-3 font-mono text-red-300">{item.cost_price}</td>
                                             <td className="px-6 py-3 text-indigo-300">{item.supplier}</td>
                                             <td className="px-6 py-3 font-mono text-emerald-400">
-                                                {Math.round(((item.price - item.cost_price) / item.price) * 100)}%
+                                                {item.price > 0 ? Math.round(((item.price - item.cost_price) / item.price) * 100) : 0}%
                                             </td>
                                         </tr>
                                     ))}
@@ -432,6 +431,7 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
                                         <div className="font-bold text-slate-200 group-hover:text-indigo-400 transition-colors flex items-center gap-2">
                                             {p.name} <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
+                                        <div className="text-xs text-slate-500">{p.contact_phone}</div>
                                         <div className="text-[10px] text-emerald-500 font-bold mt-1">
                                             {p.last_active ? `نشط منذ: ${new Date(p.last_active).toLocaleString('ar-EG')}` : 'لم يبدأ النشاط بعد'}
                                         </div>
@@ -678,11 +678,19 @@ function App() {
     const [sales, setSales] = useState<Sale[]>([]);
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [newPharm, setNewPharm] = useState({ name: '', location: '', email: '' });
+    const [newPharm, setNewPharm] = useState({ name: '', location: '', phone: '' });
 
     const addLog = (action: string, details: string) => {
         setLogs(prev => [{ id: Math.random().toString(), action, details, timestamp: new Date().toLocaleTimeString(), user: 'Super Admin' }, ...prev]);
     };
+
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+            });
+        }
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);
@@ -713,7 +721,7 @@ function App() {
 
     const handleAddPharmacy = async () => {
         const key = `RAHA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        const { error } = await supabase.from('pharmacies').insert([{ name: newPharm.name, location: newPharm.location, contact_email: newPharm.email, pharmacy_key: key, status: 'active', balance: 0, joined_date: new Date().toISOString() }]);
+        const { error } = await supabase.from('pharmacies').insert([{ name: newPharm.name, location: newPharm.location, contact_phone: newPharm.phone, pharmacy_key: key, status: 'active', balance: 0, joined_date: new Date().toISOString() }]);
         if (!error) { alert(`تم إنشاء الصيدلية بنجاح. رمز القفل: ${key}`); setShowAddModal(false); addLog('إضافة صيدلية', newPharm.name); fetchData(); }
     };
 
@@ -824,7 +832,7 @@ function App() {
                         <div className="space-y-4">
                             <input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-indigo-500" value={newPharm.name} onChange={e => setNewPharm({ ...newPharm, name: e.target.value })} placeholder="اسم الصيدلية" />
                             <input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-indigo-500" value={newPharm.location} onChange={e => setNewPharm({ ...newPharm, location: e.target.value })} placeholder="المدينة / المنطقة" />
-                            <input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-indigo-500" value={newPharm.email} onChange={e => setNewPharm({ ...newPharm, email: e.target.value })} placeholder="البريد الإلكتروني للتواصل" />
+                            <input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-indigo-500" value={newPharm.phone} onChange={e => setNewPharm({ ...newPharm, phone: e.target.value })} placeholder="رقم الهاتف للتواصل" />
                             <div className="flex gap-3 pt-4">
                                 <Button className="flex-1" variant="outline" onClick={() => setShowAddModal(false)}>إلغاء</Button>
                                 <Button className="flex-[2]" onClick={handleAddPharmacy}>تأكيد الإضافة</Button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, Plus, MoreHorizontal, Filter, CheckCircle2, XCircle, Clock, Wallet, Store, MapPin, Mail, Key, Loader2 
+  Search, Plus, MoreHorizontal, Filter, CheckCircle2, XCircle, Clock, Wallet, Store, MapPin, Phone, Key, Loader2 
 } from 'lucide-react';
 import { supabase } from '../src/supabase'; // Using the centralized config
 import Button from '../components/ui/Button';
@@ -16,7 +16,7 @@ const Pharmacies: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newPharmacyName, setNewPharmacyName] = useState('');
   const [newPharmacyLocation, setNewPharmacyLocation] = useState('');
-  const [newPharmacyEmail, setNewPharmacyEmail] = useState('');
+  const [newPharmacyPhone, setNewPharmacyPhone] = useState('');
 
   // Fetch Data from Supabase
   const fetchPharmacies = async () => {
@@ -38,7 +38,7 @@ const Pharmacies: React.FC = () => {
           status: p.status,
           joinedDate: p.joined_date,
           location: p.location || '',
-          contactEmail: p.contact_email || '',
+          contactPhone: p.contact_phone || '', // Changed mapping
           balance: p.balance || 0,
           lastActive: p.last_active
         }));
@@ -75,7 +75,7 @@ const Pharmacies: React.FC = () => {
       const { error } = await supabase.from('pharmacies').insert([{
         name: newPharmacyName,
         location: newPharmacyLocation,
-        contact_email: newPharmacyEmail,
+        contact_phone: newPharmacyPhone, // Changed field
         pharmacy_key: key,
         status: 'active',
         balance: 0,
@@ -87,7 +87,7 @@ const Pharmacies: React.FC = () => {
       setIsModalOpen(false);
       setNewPharmacyName('');
       setNewPharmacyLocation('');
-      setNewPharmacyEmail('');
+      setNewPharmacyPhone('');
       // Data will refresh via subscription or we can call fetchPharmacies()
       fetchPharmacies();
     } catch (err) {
@@ -175,7 +175,7 @@ const Pharmacies: React.FC = () => {
                         </div>
                         <div className="ms-4">
                           <div className="text-sm font-medium text-gray-900">{pharmacy.name}</div>
-                          <div className="text-xs text-gray-500">{pharmacy.contactEmail}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1"><Phone size={10} /> {pharmacy.contactPhone}</div>
                         </div>
                       </div>
                     </td>
@@ -219,7 +219,6 @@ const Pharmacies: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal removed for brevity in patch, but logic is handled in handleAddPharmacy */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
@@ -227,7 +226,7 @@ const Pharmacies: React.FC = () => {
                  <form onSubmit={handleAddPharmacy} className="space-y-4">
                     <input className="w-full border p-2 rounded" placeholder="الاسم" value={newPharmacyName} onChange={e => setNewPharmacyName(e.target.value)} required />
                     <input className="w-full border p-2 rounded" placeholder="الموقع" value={newPharmacyLocation} onChange={e => setNewPharmacyLocation(e.target.value)} required />
-                    <input className="w-full border p-2 rounded" placeholder="الإيميل" value={newPharmacyEmail} onChange={e => setNewPharmacyEmail(e.target.value)} required />
+                    <input className="w-full border p-2 rounded" placeholder="رقم الهاتف" value={newPharmacyPhone} onChange={e => setNewPharmacyPhone(e.target.value)} required />
                     <div className="flex gap-2 justify-end mt-4">
                         <Button variant="ghost" onClick={() => setIsModalOpen(false)}>إلغاء</Button>
                         <Button type="submit">حفظ</Button>

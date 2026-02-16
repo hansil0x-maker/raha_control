@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Building2, Radio, Globe, LogOut, Menu, 
-  ShieldCheck, LockKeyhole, Store, MapPin, Mail, Key, X, Loader2, RefreshCw 
+  ShieldCheck, LockKeyhole, Store, MapPin, Phone, Key, X, Loader2, RefreshCw 
 } from 'lucide-react';
 import { supabase } from './supabase';
 import { Pharmacy, DemandItem, SystemMessage, Sale, ChartDataPoint } from './data';
@@ -27,7 +27,7 @@ function App() {
 
   // --- Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newPharm, setNewPharm] = useState({ name: '', location: '', email: '' });
+  const [newPharm, setNewPharm] = useState({ name: '', location: '', phone: '' });
 
   // --- Realtime & Fetch Logic ---
   
@@ -142,7 +142,8 @@ function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // Master PIN authentication
-    if (pin === '1234') setIsAuthenticated(true);
+    const storedPin = localStorage.getItem('raha_admin_pin') || '1234';
+    if (pin === storedPin) setIsAuthenticated(true);
     else setError('رمز الدخول خاطئ');
   };
 
@@ -158,7 +159,7 @@ function App() {
         {
           name: newPharm.name,
           location: newPharm.location,
-          contact_email: newPharm.email,
+          contact_phone: newPharm.phone, // Changed from contact_email
           pharmacy_key: key,
           master_password: pass,
           status: 'active',
@@ -349,10 +350,10 @@ function App() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">البريد الرسمي</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">رقم الهاتف</label>
                 <div className="relative">
-                  <Mail className="absolute right-3 top-3 h-5 w-5 text-gray-400" />
-                  <input required type="email" className="w-full pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={newPharm.email} onChange={e => setNewPharm({...newPharm, email: e.target.value})} placeholder="manager@pharmacy.com" />
+                  <Phone className="absolute right-3 top-3 h-5 w-5 text-gray-400" />
+                  <input required type="text" className="w-full pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={newPharm.phone} onChange={e => setNewPharm({...newPharm, phone: e.target.value})} placeholder="0912345678" />
                 </div>
               </div>
               <div className="bg-indigo-50 p-4 rounded-xl flex items-start gap-3 border border-indigo-100">

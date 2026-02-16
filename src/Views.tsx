@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Users, Activity, ArrowUpRight, TrendingUp, Search, Filter, Plus, 
-  XCircle, CheckCircle2, Wallet, Lock, Unlock, Key, Radio, Tag, Megaphone, Send, AlertTriangle, CloudLightning, MapPin
+  XCircle, CheckCircle2, Wallet, Lock, Unlock, Key, Radio, Tag, Megaphone, Send, AlertTriangle, CloudLightning, MapPin, Phone
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Pharmacy, DemandItem, SystemMessage, ChartDataPoint } from './data';
@@ -141,7 +141,7 @@ export const PharmaciesView = ({ data, onToggleStatus, onAddClick }: { data: Pha
                                             </div>
                                             <div>
                                                 <div className="font-bold text-gray-900">{p.name}</div>
-                                                <div className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={10}/> {p.location || 'غير محدد'}</div>
+                                                <div className="text-xs text-gray-500 flex items-center gap-1"><Phone size={10}/> {p.contact_phone || 'غير محدد'}</div>
                                             </div>
                                         </div>
                                     </td>

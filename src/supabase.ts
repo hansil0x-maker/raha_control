@@ -25,10 +25,10 @@ export interface Database {
           master_password?: string
           status: 'active' | 'suspended'
           location?: string
-          contact_email?: string
+          contact_phone?: string // Changed from contact_email
           balance: number
           joined_date: string
-          last_active?: string // Added for Phase 5/6
+          last_active?: string
         }
         Insert: {
           id?: string
@@ -37,7 +37,7 @@ export interface Database {
           master_password?: string
           status?: 'active' | 'suspended'
           location?: string
-          contact_email?: string
+          contact_phone?: string // Changed from contact_email
           balance?: number
           joined_date?: string
           last_active?: string
@@ -49,7 +49,7 @@ export interface Database {
           master_password?: string
           status?: 'active' | 'suspended'
           location?: string
-          contact_email?: string
+          contact_phone?: string // Changed from contact_email
           balance?: number
           joined_date?: string
           last_active?: string
@@ -85,8 +85,8 @@ export interface Database {
         Row: {
           id: string
           pharmacy_id: string
-          item_name: string // Changed from medicine_name
-          request_count: number // Changed from quantity
+          item_name: string
+          request_count: number
           status: 'pending' | 'supplied' | 'received'
           urgency?: 'low' | 'medium' | 'high'
           created_at: string

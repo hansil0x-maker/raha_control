@@ -7,7 +7,7 @@ export interface Pharmacy {
   status: PharmacyStatus;
   joinedDate: string; // ISO Date string
   location: string;
-  contactEmail: string;
+  contactPhone: string; // Changed from contactEmail
   balance: number; // Wallet balance in SDG
   lastActive?: string;
 }

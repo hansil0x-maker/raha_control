@@ -10,15 +10,15 @@ export interface Pharmacy {
   status: PharmacyStatus;
   joined_date?: string;
   location?: string;
-  contact_email?: string;
+  contact_phone?: string; // Changed from contact_email
   balance: number;
   last_active?: string;
 }
 
 export interface DemandItem {
   id: string;
-  item_name: string; // Corrected from medicine_name
-  request_count: number; // Corrected from quantity
+  item_name: string;
+  request_count: number;
   pharmacy_id: string;
   pharmacy_name?: string; 
   status: 'pending' | 'supplied' | 'received';
