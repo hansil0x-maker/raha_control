@@ -7,7 +7,7 @@ import {
     Wallet, Lock, Unlock, Tag, Megaphone, Send, AlertTriangle, CloudLightning,
     FileSpreadsheet, BarChart3, AlertOctagon, ArrowUpRight,
     History, DollarSign, Command, X, RefreshCw, Loader2, Activity, Users, TrendingUp, Key,
-    Smartphone, Eye, Clock, Database, ShieldAlert, Laptop, Phone, MapPin
+    Smartphone, Eye, Clock, Database, ShieldAlert, Laptop, Phone, MapPin, Truck
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,7 +21,7 @@ const SUPABASE_KEY = 'sb_publishable_9Nmdm3LJUHK1fBF0ihj38g_ophBRHyD';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- TYPES ---
-type ViewType = 'overview' | 'pharmacies' | 'radar' | 'global' | 'security';
+type ViewType = 'overview' | 'pharmacies' | 'radar' | 'global' | 'security' | 'pricespy' | 'suppliers';
 type Priority = 'normal' | 'urgent';
 
 interface Pharmacy {
@@ -43,11 +43,14 @@ interface Device {
     hardware_id: string;
     device_name: string;
     last_login: string;
+    is_banned?: boolean;
 }
 
 interface InventoryItem {
     id: string;
+    pharmacy_id?: string;
     name: string;
+    barcode?: string;
     price: number;
     cost_price: number;
     supplier: string;
@@ -159,20 +162,55 @@ const Overview = ({ pharmacies, sales }: { pharmacies: Pharmacy[], sales: Sale[]
     const criticalCount = pharmacies.filter(p => p.balance < 0).length;
 
     const salesByMonth = useMemo(() => {
-        const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'];
-        // تجميع المبيعات حقيقياً حسب الشهر (مثال بسيط بناءً على البيانات المتوفرة)
-        return months.map((m) => ({
-            name: m,
-            value: sales.length > 0 ? (totalSales / months.length) : 0 // توزيع تقديري إذا لم يتوفر تاريخ دقيق لكل شهر، أو 0 إذا لا توجد مبيعات
-        }));
-    }, [totalSales, sales]);
+        const data = Array(6).fill(0).map((_, i) => {
+            const d = new Date();
+            d.setMonth(d.getMonth() - (5 - i));
+            return { name: d.toLocaleDateString('ar-EG', { month: 'short' }), month: d.getMonth(), year: d.getFullYear(), value: 0 };
+        });
+
+        sales.forEach(s => {
+            const date = new Date(s.created_at);
+            const m = date.getMonth();
+            const y = date.getFullYear();
+            const slot = data.find(d => d.month === m && d.year === y);
+            if (slot) slot.value += (s.total_amount || 0);
+        });
+
+        return data;
+    }, [sales]);
+
+    const dailySalesAmount = useMemo(() => {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        return sales
+            .filter(s => new Date(s.created_at).getTime() >= todayStart.getTime())
+            .reduce((sum, s) => sum + (s.total_amount || 0), 0);
+    }, [sales]);
 
     const topPharmacies = useMemo(() => {
+        const phSales: Record<string, number> = {};
+        sales.forEach(s => { phSales[s.pharmacy_id] = (phSales[s.pharmacy_id] || 0) + (s.total_amount || 0); });
         return pharmacies
-            .sort((a, b) => b.balance - a.balance)
-            .slice(0, 5)
-            .map(p => ({ name: p.name, value: p.balance }));
-    }, [pharmacies]);
+            .map(p => ({ name: p.name, value: phSales[p.id] || 0 }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }, [pharmacies, sales]);
+
+    const [reminderText, setReminderText] = useState('');
+    const [reminders, setReminders] = useState<{id: string, text: string, done: boolean}[]>(() => {
+        try { return JSON.parse(localStorage.getItem('raha_admin_reminders') || '[]'); } catch { return []; }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('raha_admin_reminders', JSON.stringify(reminders));
+    }, [reminders]);
+
+    const addReminder = (e: any) => {
+        e.preventDefault();
+        if (!reminderText) return;
+        setReminders([...reminders, { id: Date.now().toString(), text: reminderText, done: false }]);
+        setReminderText('');
+    };
 
     return (
         <div className="space-y-6">
@@ -201,8 +239,8 @@ const Overview = ({ pharmacies, sales }: { pharmacies: Pharmacy[], sales: Sale[]
                 <GlassCard className="relative overflow-hidden group">
                     <div className="absolute right-0 top-0 p-4 opacity-10"><CloudLightning size={80} className="text-amber-400" /></div>
                     <div className="flex items-center gap-3 mb-2 text-amber-400"><TrendingUp size={20} /><span className="text-sm font-medium">المبيعات اليومية</span></div>
-                    <div className="text-3xl font-bold text-white mb-1">245</div>
-                    <div className="text-xs text-slate-400">عملية بيع</div>
+                    <div className="text-3xl font-bold text-white mb-1">{formatCurrency(dailySalesAmount)}</div>
+                    <div className="text-xs text-slate-400">إجمالي دخل اليوم</div>
                 </GlassCard>
             </div>
 
@@ -246,12 +284,32 @@ const Overview = ({ pharmacies, sales }: { pharmacies: Pharmacy[], sales: Sale[]
                         ))}
                     </div>
                 </GlassCard>
+
+                <GlassCard className="lg:col-span-1 min-h-[400px] flex flex-col">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Clock size={16} className="text-blue-400" /> تذكيراتي الشخصية</h3>
+                    <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                        {reminders.map(r => (
+                            <div key={r.id} className="flex justify-between items-center p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                                <span className={`text-sm ${r.done ? 'line-through text-slate-500' : 'text-slate-200'}`}>{r.text}</span>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setReminders(reminders.map(x => x.id === r.id ? {...x, done: !x.done} : x))} className="text-emerald-400 hover:text-emerald-300"><Activity size={16}/></button>
+                                    <button onClick={() => setReminders(reminders.filter(x => x.id !== r.id))} className="text-red-400 hover:text-red-300"><X size={16}/></button>
+                                </div>
+                            </div>
+                        ))}
+                        {reminders.length === 0 && <div className="text-xs text-slate-500 text-center py-4">لاتوجد تذكيرات مسجلة</div>}
+                    </div>
+                    <form onSubmit={addReminder} className="flex gap-2">
+                        <input value={reminderText} onChange={e => setReminderText(e.target.value)} placeholder="أضف تذكيراً جديداً..." className="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white focus:border-indigo-500 outline-none" />
+                        <Button type="submit" variant="outline" className="px-3"><Plus size={16}/></Button>
+                    </form>
+                </GlassCard>
             </div>
         </div>
     );
 };
 
-const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory }: { pharmacy: Pharmacy, onClose: () => void, sales: Sale[], devices: Device[], inventory: InventoryItem[] }) => {
+const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory, onToggleBan }: { pharmacy: Pharmacy, onClose: () => void, sales: Sale[], devices: Device[], inventory: InventoryItem[], onToggleBan: (d: string, b: boolean) => void }) => {
     // Calculate Peak Hours from Sales
     const peakHoursData = useMemo(() => {
         const hours = Array(24).fill(0).map((_, i) => ({ name: `${i}:00`, count: 0 }));
@@ -307,8 +365,11 @@ const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory }: {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <Badge variant="online">Online</Badge>
+                                            <Badge variant={d.is_banned ? "suspended" : "online"}>{d.is_banned ? "Banned" : "Online"}</Badge>
                                             <div className="text-[10px] text-slate-500 mt-1">{new Date(d.last_login).toLocaleTimeString()}</div>
+                                            <button onClick={() => onToggleBan(d.id, !d.is_banned)} className="mt-2 text-[10px] bg-red-500/10 text-red-400 hover:bg-red-500/20 px-2 py-1 rounded transition-colors block">
+                                                {d.is_banned ? 'فك الحظر' : 'قفل الجهاز (Ban)'}
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -380,17 +441,22 @@ const PharmacyDetailModal = ({ pharmacy, onClose, sales, devices, inventory }: {
     );
 };
 
-const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy[], onUpdateStatus: any, onAdd: any, sales: Sale[] }) => {
+const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales, onToggleBan }: { data: Pharmacy[], onUpdateStatus: any, onAdd: any, sales: Sale[], onToggleBan: any }) => {
     const [search, setSearch] = useState('');
+    const [locFilter, setLocFilter] = useState('');
     const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
     const [activeDevices, setActiveDevices] = useState<Device[]>([]);
     const [activeInventory, setActiveInventory] = useState<InventoryItem[]>([]);
 
-    const filtered = data.filter(p => p.name.includes(search) || p.pharmacy_key.includes(search));
+    const locations = Array.from(new Set(data.map(p => p.location).filter(Boolean)));
+    const filtered = data.filter(p => 
+        (p.name.includes(search) || p.pharmacy_key.includes(search)) &&
+        (locFilter === '' || p.location === locFilter)
+    );
 
     const handleOpenDetail = async (pharmacy: Pharmacy) => {
         const { data: devData } = await supabase.from('pharmacy_devices').select('*').eq('pharmacy_id', pharmacy.id);
-        const { data: invData } = await supabase.from('medicines').select('*').eq('pharmacy_id', pharmacy.id).limit(10);
+        const { data: invData } = await supabase.from('medicines').select('id, name, stock, price, cost_price, supplier').eq('pharmacy_id', pharmacy.id).order('stock', { ascending: true });
         setActiveDevices(devData || []);
         setActiveInventory(invData || []);
         setSelectedPharmacy(pharmacy);
@@ -412,6 +478,12 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
                         <Search className="absolute right-3 top-3 text-slate-500" size={18} />
                         <input type="text" placeholder="بحث باسم الصيدلية أو المفتاح..." className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 pr-10 text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors" value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
+                    {locations.length > 0 && (
+                        <select className="bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 px-4 text-slate-200 focus:outline-none focus:border-indigo-500" value={locFilter} onChange={e => setLocFilter(e.target.value)}>
+                            <option value="">كل المواقع</option>
+                            {locations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                        </select>
+                    )}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-right">
@@ -425,15 +497,21 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/50">
-                            {filtered.map(p => (
+                            {filtered.map(p => {
+                                const pSales = sales.filter(s => s.pharmacy_id === p.id).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                                const lastSale = pSales[0]?.created_at;
+                                const isChurnRisk = lastSale ? (Date.now() - new Date(lastSale).getTime() > 24 * 60 * 60 * 1000) : true;
+
+                                return (
                                 <tr key={p.id} onClick={() => handleOpenDetail(p)} className="hover:bg-slate-800/50 transition-colors cursor-pointer group">
                                     <td className="px-6 py-4">
                                         <div className="font-bold text-slate-200 group-hover:text-indigo-400 transition-colors flex items-center gap-2">
-                                            {p.name} <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            {p.name} {isChurnRisk && <span className="animate-pulse bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full ml-2 flex items-center gap-1"><AlertTriangle size={10} /> خطر التوقف (Churn Risk)</span>}
+                                            <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                         <div className="text-xs text-slate-500">{p.contact_phone}</div>
                                         <div className="text-[10px] text-emerald-500 font-bold mt-1">
-                                            {p.last_active ? `نشط منذ: ${new Date(p.last_active).toLocaleString('ar-EG')}` : 'لم يبدأ النشاط بعد'}
+                                            {lastSale ? `آخر مبيعة: ${new Date(lastSale).toLocaleString('ar-EG')}` : 'لم يقم بأي مبيعة'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4"><code className="bg-slate-900 px-2 py-1 rounded text-xs text-slate-400 font-mono border border-slate-800">{p.pharmacy_key}</code></td>
@@ -447,7 +525,8 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
                                         </button>
                                     </td>
                                 </tr>
-                            ))}
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -460,6 +539,10 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
                     sales={sales}
                     devices={activeDevices}
                     inventory={activeInventory}
+                    onToggleBan={async (dId, isBanned) => {
+                        await onToggleBan(dId, isBanned);
+                        setActiveDevices(prev => prev.map(d => d.id === dId ? { ...d, is_banned: isBanned } : d));
+                    }}
                 />
             )}
         </div>
@@ -468,6 +551,7 @@ const PharmaciesView = ({ data, onUpdateStatus, onAdd, sales }: { data: Pharmacy
 
 const MarketRadar = ({ demands, pharmacies }: { demands: DemandItem[], pharmacies: Pharmacy[] }) => {
     const [addMode, setAddMode] = useState(false);
+    const [viewMode, setViewMode] = useState<'aggregate'|'individual'>('aggregate');
     const [newItem, setNewItem] = useState({ name: '', qty: '', pharm_id: '' });
 
     const handleAddShortage = async () => {
@@ -509,10 +593,23 @@ const MarketRadar = ({ demands, pharmacies }: { demands: DemandItem[], pharmacie
         downloadCSV(exportData, 'market_demand.csv');
     };
 
+    const aggregatedDemands = useMemo(() => {
+        const groups: Record<string, { name: string; totalQty: number; pharmacies: Set<string> }> = {};
+        demands.forEach(d => {
+            if (!groups[d.item_name]) groups[d.item_name] = { name: d.item_name, totalQty: 0, pharmacies: new Set() };
+            groups[d.item_name].totalQty += d.request_count;
+            groups[d.item_name].pharmacies.add(d.pharmacy_name || 'Unknown');
+        });
+        return Object.values(groups).map(g => ({ name: g.name, totalQty: g.totalQty, pharmacies: Array.from(g.pharmacies) })).sort((a,b) => b.totalQty - a.totalQty);
+    }, [demands]);
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Radio className="text-indigo-400 animate-pulse" /> رادار النواقص الذكي</h2>
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Radio className="text-indigo-400 animate-pulse" /> رادار الطلب المجمّع (Wholesale Power)</h2>
+                    <p className="text-slate-400 text-xs mt-1">يجمع النواقص تلقائياً من كافة الصيدليات ليتيح لك قوة تفاوضية مع الموردين</p>
+                </div>
                 <div className="flex gap-2">
                     <Button variant="outline" icon={Plus} onClick={() => setAddMode(!addMode)}>إضافة يدوياً</Button>
                     <Button variant="outline" icon={FileSpreadsheet} onClick={handleExport}>تصدير Excel</Button>
@@ -521,7 +618,7 @@ const MarketRadar = ({ demands, pharmacies }: { demands: DemandItem[], pharmacie
 
             {addMode && (
                 <GlassCard className="border-indigo-500/50 bg-indigo-900/10 animate-in slide-in-from-top duration-300">
-                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><ShieldAlert className="text-indigo-400" /> إضافة ناقص جديد (Deduplication Check Active)</h3>
+                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><ShieldAlert className="text-indigo-400" /> إضافة ناقص جديد</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">اسم الدواء</label>
@@ -545,7 +642,7 @@ const MarketRadar = ({ demands, pharmacies }: { demands: DemandItem[], pharmacie
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <GlassCard className="lg:col-span-1 border-indigo-500/30">
-                    <h3 className="text-sm font-bold text-indigo-300 mb-4 uppercase tracking-wider">الأكثر طلباً (Aggregate)</h3>
+                    <h3 className="text-sm font-bold text-indigo-300 mb-4 uppercase tracking-wider">الأكثر طلباً</h3>
                     <div className="h-[250px] w-full dir-ltr">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={topMedicines} layout="vertical" margin={{ left: 0 }}>
@@ -561,25 +658,136 @@ const MarketRadar = ({ demands, pharmacies }: { demands: DemandItem[], pharmacie
                         </ResponsiveContainer>
                     </div>
                 </GlassCard>
-                <GlassCard className="lg:col-span-2 p-0 overflow-hidden">
-                    <div className="p-4 bg-slate-800/50 border-b border-slate-700/50 flex justify-between items-center"><span className="text-sm font-bold text-slate-300">طلبات السوق الموحدة</span><Badge variant="active">{demands.length}</Badge></div>
+                <GlassCard className="lg:col-span-2 p-0 overflow-hidden flex flex-col">
+                    <div className="p-4 bg-slate-800/50 border-b border-slate-700/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <span className="text-sm font-bold text-slate-300">تبويب النواقص</span>
+                        <div className="flex bg-slate-900 rounded-lg p-1">
+                            <button onClick={() => setViewMode('aggregate')} className={`px-4 py-1.5 text-xs rounded-md transition-colors ${viewMode === 'aggregate' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>مجمعة (قوة تفاوض)</button>
+                            <button onClick={() => setViewMode('individual')} className={`px-4 py-1.5 text-xs rounded-md transition-colors ${viewMode === 'individual' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>تفصيلية (بالحبة)</button>
+                        </div>
+                    </div>
                     <div className="overflow-y-auto max-h-[300px]">
-                        <table className="w-full text-right text-sm">
-                            <thead className="bg-slate-800/30 text-slate-400 sticky top-0 backdrop-blur-md"><tr><th className="px-4 py-3">الصنف</th><th className="px-4 py-3">عدد الطلبات</th><th className="px-4 py-3">الصيدلية</th><th className="px-4 py-3">الحالة</th></tr></thead>
-                            <tbody className="divide-y divide-slate-700/30">
-                                {demands.map(d => (
-                                    <tr key={d.id} className="hover:bg-slate-700/20">
-                                        <td className="px-4 py-3 text-slate-200">{d.item_name}</td>
-                                        <td className="px-4 py-3 font-mono text-indigo-300">{d.request_count}</td>
-                                        <td className="px-4 py-3 text-slate-400">{d.pharmacy_name}</td>
-                                        <td className="px-4 py-3"><Badge variant="normal">{d.status}</Badge></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        {viewMode === 'aggregate' ? (
+                            <table className="w-full text-right text-sm">
+                                <thead className="bg-slate-800/30 text-slate-400 sticky top-0 backdrop-blur-md"><tr><th className="px-4 py-3">الصنف</th><th className="px-4 py-3">إجمالي الطلب</th><th className="px-4 py-3">الصيدليات الطالبة</th></tr></thead>
+                                <tbody className="divide-y divide-slate-700/30">
+                                    {aggregatedDemands.map((d, i) => (
+                                        <tr key={i} className="hover:bg-slate-700/20">
+                                            <td className="px-4 py-3 text-slate-200 font-bold">{d.name}</td>
+                                            <td className="px-4 py-3 font-mono text-emerald-400">{d.totalQty} علبة</td>
+                                            <td className="px-4 py-3 text-slate-400 text-xs">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {d.pharmacies.map((p, j) => <span key={j} className="bg-slate-800 px-2 py-0.5 rounded">{p}</span>)}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <table className="w-full text-right text-sm">
+                                <thead className="bg-slate-800/30 text-slate-400 sticky top-0 backdrop-blur-md"><tr><th className="px-4 py-3">الصنف</th><th className="px-4 py-3">المطلوب</th><th className="px-4 py-3">الصيدلية</th><th className="px-4 py-3">تاريخ الطلب</th></tr></thead>
+                                <tbody className="divide-y divide-slate-700/30">
+                                    {demands.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(d => (
+                                        <tr key={d.id} className="hover:bg-slate-700/20">
+                                            <td className="px-4 py-3 text-slate-200 font-bold">{d.item_name}</td>
+                                            <td className="px-4 py-3 font-mono text-amber-400">{d.request_count}</td>
+                                            <td className="px-4 py-3 text-indigo-300">{d.pharmacy_name}</td>
+                                            <td className="px-4 py-3 text-slate-500 font-mono text-xs">{new Date(d.created_at).toLocaleDateString('ar-EG')}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </GlassCard>
             </div>
+        </div>
+    );
+};
+
+const PriceSpyView = ({ medicines, pharmacies }: { medicines: InventoryItem[], pharmacies: Pharmacy[] }) => {
+    const priceAnalysis = useMemo(() => {
+        const groups: Record<string, { name: string; prices: { pId: string; pName: string; cost: number; supplier: string }[] }> = {};
+        medicines.forEach(m => {
+            const key = m.barcode || m.name.toLowerCase();
+            if (!groups[key]) groups[key] = { name: m.name, prices: [] };
+            const pName = pharmacies.find(p => p.id === m.pharmacy_id)?.name || 'Unknown';
+            if (m.cost_price > 0) groups[key].prices.push({ pId: m.pharmacy_id!, pName, cost: m.cost_price, supplier: m.supplier });
+        });
+
+        const discrepancies = Object.values(groups)
+            .filter(g => g.prices.length > 1) // Only items present in multiple pharmacies
+            .map(g => {
+                const costs = g.prices.map(p => p.cost);
+                const minCost = Math.min(...costs);
+                const maxCost = Math.max(...costs);
+                const diffPercent = ((maxCost - minCost) / minCost) * 100;
+                
+                const minPharmacy = g.prices.find(p => p.cost === minCost);
+                const maxPharmacy = g.prices.find(p => p.cost === maxCost);
+
+                return { ...g, minCost, maxCost, diffPercent, minPharmacy, maxPharmacy };
+            })
+            .filter(d => d.diffPercent > 0) // Only show items with actual price differences
+            .sort((a, b) => b.diffPercent - a.diffPercent);
+        
+        return discrepancies;
+    }, [medicines, pharmacies]);
+
+    return (
+        <div className="space-y-6">
+             <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Eye className="text-rose-400 animate-pulse" /> جاسوس الأسعار السحابي (Market Price Index)</h2>
+                    <p className="text-slate-400 text-xs mt-1">تحليل تباين أسعار الشراء (التكلفة) بين الصيدليات لتوجيهها نحو المورد الأرخص</p>
+                </div>
+            </div>
+
+            <GlassCard className="p-0 overflow-hidden">
+                <div className="p-4 bg-slate-800/50 border-b border-slate-700/50 flex justify-between items-center"><span className="text-sm font-bold text-slate-300">التباينات العالية في أسعار الشراء</span><Badge variant="high">{priceAnalysis.length} صنف متفاوت</Badge></div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-right text-sm">
+                        <thead className="bg-slate-800/30 text-slate-400">
+                            <tr>
+                                <th className="px-6 py-4">الصنف</th>
+                                <th className="px-6 py-4 text-emerald-400">أقل سعر شراء (الأفضل)</th>
+                                <th className="px-6 py-4 text-rose-400">أعلى سعر شراء (خسارة)</th>
+                                <th className="px-6 py-4">نسبة الفارق</th>
+                                <th className="px-6 py-4">إجراء مقترح</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/30">
+                            {priceAnalysis.map((item, i) => (
+                                <tr key={i} className="hover:bg-slate-700/20">
+                                    <td className="px-6 py-4 font-bold text-slate-200">{item.name}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-mono text-emerald-400 font-bold">{formatCurrency(item.minCost)}</div>
+                                        <div className="text-xs text-slate-400">{item.minPharmacy?.pName} ({item.minPharmacy?.supplier || 'مورد غير معروف'})</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-mono text-rose-400 font-bold">{formatCurrency(item.maxCost)}</div>
+                                        <div className="text-xs text-slate-400">{item.maxPharmacy?.pName} ({item.maxPharmacy?.supplier || 'مورد غير معروف'})</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="bg-rose-500/20 text-rose-400 px-2 py-1 rounded border border-rose-500/30">+{item.diffPercent.toFixed(1)}% زيادة</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <Button variant="outline" className="text-[10px] py-1 px-2 h-auto" onClick={() => alert(`إرسال تنبيه لـ ${item.maxPharmacy?.pName}: \nانتبه، المورد "${item.maxPharmacy?.supplier}" يبيعك بسعر مرتفع. المورد "${item.minPharmacy?.supplier}" الذي تتعامل معه "${item.minPharmacy?.pName}" لديه سعر أفضل.`)}>
+                                            تنبيه الصيدلية
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {priceAnalysis.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">لا يوجد تفاوت في أسعار الشراء المسجلة حالياً.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </GlassCard>
         </div>
     );
 };
@@ -667,6 +875,87 @@ const CommandCenter = ({ onPriceUpdate, onBroadcast, logs }: { onPriceUpdate: an
     );
 };
 
+const SuppliersView = () => {
+    const [suppliers, setSuppliers] = useState<any[]>(() => {
+        try { return JSON.parse(localStorage.getItem('raha_suppliers') || '[]'); } catch { return []; }
+    });
+    const [newSup, setNewSup] = useState({ name: '', category: '', phone: '' });
+    
+    useEffect(() => {
+        localStorage.setItem('raha_suppliers', JSON.stringify(suppliers));
+    }, [suppliers]);
+
+    const handleAdd = (e: any) => {
+        e.preventDefault();
+        if (!newSup.name) return;
+        setSuppliers([{ id: Date.now().toString(), ...newSup, added: new Date().toLocaleDateString('ar-EG') }, ...suppliers]);
+        setNewSup({ name: '', category: '', phone: '' });
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Truck className="text-blue-400" /> إدارة الموردين (Suppliers)</h2>
+                    <p className="text-slate-400 text-xs mt-1">قاعدة بيانات مركزية للموردين المفضّلين لتسهيل الربط السريع وعمليات الشراء المجمعة</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <GlassCard className="lg:col-span-1 h-fit border-blue-500/30">
+                    <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Plus size={16} /> مورد جديد</h3>
+                    <form onSubmit={handleAdd} className="space-y-4">
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-1">اسم المورد / الشركة</label>
+                            <input className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500" value={newSup.name} onChange={e => setNewSup({ ...newSup, name: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-1">التخصص (أدوية، مستلزمات...)</label>
+                            <input className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500" value={newSup.category} onChange={e => setNewSup({ ...newSup, category: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-1">رقم التواصل</label>
+                            <input className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500" value={newSup.phone} onChange={e => setNewSup({ ...newSup, phone: e.target.value })} />
+                        </div>
+                        <Button className="w-full bg-blue-600 hover:bg-blue-500" type="submit">حفظ المورد</Button>
+                    </form>
+                </GlassCard>
+
+                <GlassCard className="lg:col-span-2 p-0 overflow-hidden">
+                    <div className="p-4 bg-slate-800/50 border-b border-slate-700/50"><span className="text-sm font-bold text-slate-300">سجل الموردين المعتمدين</span></div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-right text-sm">
+                            <thead className="bg-slate-800/30 text-slate-400">
+                                <tr>
+                                    <th className="px-6 py-4">اسم المورد</th>
+                                    <th className="px-6 py-4">التخصص</th>
+                                    <th className="px-6 py-4">الهاتف</th>
+                                    <th className="px-6 py-4">تاريخ الإضافة</th>
+                                    <th className="px-6 py-4">إجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700/30">
+                                {suppliers.map(s => (
+                                    <tr key={s.id} className="hover:bg-slate-700/20">
+                                        <td className="px-6 py-4 text-slate-200 font-bold">{s.name}</td>
+                                        <td className="px-6 py-4 text-indigo-300"><Badge variant="default">{s.category || 'عام'}</Badge></td>
+                                        <td className="px-6 py-4 font-mono text-slate-300">{s.phone || '---'}</td>
+                                        <td className="px-6 py-4 text-slate-500 text-xs">{s.added}</td>
+                                        <td className="px-6 py-4">
+                                            <button onClick={() => setSuppliers(suppliers.filter(x => x.id !== s.id))} className="text-red-400 hover:text-red-300 p-2"><X size={16} /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {suppliers.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-slate-500">لا يوجد موردين مسجلين حالياً</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </GlassCard>
+            </div>
+        </div>
+    );
+};
+
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [pin, setPin] = useState('');
@@ -676,6 +965,7 @@ function App() {
     const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
     const [demands, setDemands] = useState<DemandItem[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
+    const [medicines, setMedicines] = useState<InventoryItem[]>([]);
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newPharm, setNewPharm] = useState({ name: '', location: '', phone: '' });
@@ -697,11 +987,13 @@ function App() {
         try {
             const { data: phData } = await supabase.from('pharmacies').select('*');
             const { data: demData } = await supabase.from('wanted_list').select('*').eq('status', 'pending');
-            const { data: salesData } = await supabase.from('sales').select('*').limit(1000).order('timestamp', { ascending: false });
+            const { data: salesData } = await supabase.from('sales').select('id, pharmacy_id, net_amount, timestamp').limit(2000).order('timestamp', { ascending: false });
+            const { data: medData } = await supabase.from('medicines').select('id, name, barcode, price, cost_price, supplier, pharmacy_id');
 
             if (phData) setPharmacies(phData.map((p: any) => ({ ...p, status: p.balance < 0 ? 'suspended' : p.status })));
             if (demData) setDemands(demData.map((d: any) => ({ ...d, pharmacy_name: phData?.find((p: any) => p.id === d.pharmacy_id)?.name || 'Unknown' })));
             if (salesData) setSales(salesData.map((s: any) => ({ id: s.id, pharmacy_id: s.pharmacy_id, total_amount: s.net_amount, created_at: new Date(Number(s.timestamp)).toISOString() })));
+            if (medData) setMedicines(medData);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
@@ -720,9 +1012,30 @@ function App() {
     };
 
     const handleAddPharmacy = async () => {
+        if (!newPharm.name) { alert('يرجى إدخال اسم الصيدلية'); return; }
         const key = `RAHA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        const { error } = await supabase.from('pharmacies').insert([{ name: newPharm.name, location: newPharm.location, contact_phone: newPharm.phone, pharmacy_key: key, status: 'active', balance: 0, joined_date: new Date().toISOString() }]);
-        if (!error) { alert(`تم إنشاء الصيدلية بنجاح. رمز القفل: ${key}`); setShowAddModal(false); addLog('إضافة صيدلية', newPharm.name); fetchData(); }
+        const masterPass = Math.floor(1000 + Math.random() * 9000).toString(); // توليد كلمة مرور عشوائية 4 أرقام
+
+        const { error } = await supabase.from('pharmacies').insert([{
+            name: newPharm.name,
+            location: newPharm.location,
+            contact_phone: newPharm.phone,
+            pharmacy_key: key,
+            master_password: masterPass,
+            status: 'active',
+            balance: 0,
+            joined_date: new Date().toISOString()
+        }]);
+
+        if (!error) {
+            alert(`تم إنشاء الصيدلية بنجاح.\nرمز التفعيل: ${key}\nكلمة المرور الرئيسية: ${masterPass}`);
+            setShowAddModal(false);
+            addLog('إضافة صيدلية', newPharm.name);
+            fetchData();
+        } else {
+            console.error('Registration Error:', error);
+            alert(`خطأ في الإضافة: ${error.message}`);
+        }
     };
 
     const toggleStatus = async (id: string) => {
@@ -742,6 +1055,14 @@ function App() {
             await supabase.from('medicines').update({ price: Number(price) }).eq('barcode', barcode);
             addLog('تحديث سعر شامل', barcode);
             alert('تم تطبيق السعر الجديد');
+        }
+    };
+
+    const toggleDeviceBan = async (deviceId: string, isBanned: boolean) => {
+        if (confirm(`هل أنت متأكد من ${isBanned ? 'حظر هذا الجهاز وإخراجه؟' : 'فك الحظر عن هذا الجهاز؟'}`)) {
+            await supabase.from('pharmacy_devices').update({ is_banned: isBanned }).eq('id', deviceId);
+            addLog(isBanned ? 'حظر جهاز (Kill Switch)' : 'فك حظر جهاز', `Device ID: ${deviceId}`);
+            fetchData();
         }
     };
 
@@ -790,7 +1111,9 @@ function App() {
                     {[
                         { id: 'overview', icon: LayoutDashboard, label: 'الرؤية العامة' },
                         { id: 'pharmacies', icon: Building2, label: 'إدارة الصيدليات' },
-                        { id: 'radar', icon: Radio, label: 'رادار النواقص' },
+                        { id: 'radar', icon: Radio, label: 'الطلب المجمّع (Wholesale)' },
+                        { id: 'pricespy', icon: Eye, label: 'جاسوس الأسعار' },
+                        { id: 'suppliers', icon: Truck, label: 'إدارة الموردين' },
                         { id: 'global', icon: Globe, label: 'الأومامر المركزية' },
                         { id: 'security', icon: ShieldCheck, label: 'لوحة الأمان' }
                     ].map(item => (
@@ -817,8 +1140,10 @@ function App() {
                     <AnimatePresence mode='wait'>
                         <motion.div key={view} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
                             {view === 'overview' && <Overview pharmacies={pharmacies} sales={sales} />}
-                            {view === 'pharmacies' && <PharmaciesView data={pharmacies} onUpdateStatus={toggleStatus} onAdd={() => setShowAddModal(true)} sales={sales} />}
+                            {view === 'pharmacies' && <PharmaciesView data={pharmacies} onUpdateStatus={toggleStatus} onAdd={() => setShowAddModal(true)} sales={sales} onToggleBan={toggleDeviceBan} />}
                             {view === 'radar' && <MarketRadar demands={demands} pharmacies={pharmacies} />}
+                            {view === 'pricespy' && <PriceSpyView medicines={medicines} pharmacies={pharmacies} />}
+                            {view === 'suppliers' && <SuppliersView />}
                             {view === 'global' && <CommandCenter onPriceUpdate={updatePrice} onBroadcast={broadcast} logs={logs} />}
                             {view === 'security' && <SecurityPanel pharmacies={pharmacies} onUpdatePass={updateMasterPass} />}
                         </motion.div>
