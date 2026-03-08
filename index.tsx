@@ -1000,24 +1000,6 @@ function App() {
     useEffect(() => {
         if (isAuthenticated) {
             fetchData();
-            let channel: any = null;
-            try {
-                channel = supabase.channel('realtime_admin');
-                if (channel && typeof channel.on === 'function') {
-                    channel
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacies' }, () => fetchData())
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchData());
-                    if (typeof channel.subscribe === 'function') {
-                        channel.subscribe((status: string) => {
-                            if (status === 'SUBSCRIBED') console.log('✅ Control Center Realtime connected');
-                            else if (status === 'CHANNEL_ERROR') console.warn('⚠️ Control Center channel error');
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error('Realtime setup error:', err);
-            }
-            return () => { if (channel && supabase) supabase.removeChannel(channel); };
         }
     }, [isAuthenticated]);
 
