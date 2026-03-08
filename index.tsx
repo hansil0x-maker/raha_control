@@ -1000,7 +1000,10 @@ function App() {
     useEffect(() => {
         if (isAuthenticated) {
             fetchData();
-            const channel = supabase.channel('realtime_admin').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+            const channel = supabase.channel('realtime_admin');
+            channel.on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacies' }, () => fetchData());
+            channel.on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchData());
+            channel.subscribe();
             return () => { supabase.removeChannel(channel) };
         }
     }, [isAuthenticated]);
