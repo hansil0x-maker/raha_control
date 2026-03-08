@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // --- CONFIGURATION ---
 const SUPABASE_URL = 'https://cihficjizojbtnshwtfl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_9Nmdm3LJUHK1fBF0ihj38g_ophBRHyD';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpaGZpY2ppem9qYnRuc2h3dGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwOTEyMDQsImV4cCI6MjA4NDY2NzIwNH0.lta6_WMeXAdvJhZKJd4e-9tSxoZX9DOvuoCPkuSWpO8';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- TYPES ---
@@ -1000,11 +1000,24 @@ function App() {
     useEffect(() => {
         if (isAuthenticated) {
             fetchData();
-            const channel = supabase.channel('realtime_admin');
-            channel.on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacies' }, () => fetchData());
-            channel.on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchData());
-            channel.subscribe();
-            return () => { supabase.removeChannel(channel) };
+            let channel: any = null;
+            try {
+                channel = supabase.channel('realtime_admin');
+                if (channel && typeof channel.on === 'function') {
+                    channel
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacies' }, () => fetchData())
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchData());
+                    if (typeof channel.subscribe === 'function') {
+                        channel.subscribe((status: string) => {
+                            if (status === 'SUBSCRIBED') console.log('✅ Control Center Realtime connected');
+                            else if (status === 'CHANNEL_ERROR') console.warn('⚠️ Control Center channel error');
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Realtime setup error:', err);
+            }
+            return () => { if (channel && supabase) supabase.removeChannel(channel); };
         }
     }, [isAuthenticated]);
 
